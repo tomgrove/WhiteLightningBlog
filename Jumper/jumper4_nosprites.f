@@ -1,3 +1,9 @@
+( Fox game - an unfinished game that could make my fortune if I can send it back in time to 1984 )
+( and finish it )
+
+( some variables for tracking how much of the dictionary we have consumed )
+( so we can tell how near we are from treading on the computation stack )
+
 0 VARIABLE LASTHERE 
 0 VARIABLE FIRSTHERE 
 
@@ -5,6 +11,8 @@ HERE DUP LASTHERE ! FIRSTHERE !
 
 	
 ." sprite creation "  HERE LASTHERE @  - U. CR HERE LASTHERE ! 
+
+( some assembly - mainly for multiplies and divides ) 
 
 HEX
 
@@ -88,6 +96,8 @@ DECIMAL
 
 ." custom assembly "  HERE LASTHERE @  - U. CR HERE LASTHERE ! 
 
+( some forth words to define structures and arrays )
+
 : <STRUCT 
 	<BUILDS 0 , HERE 2 -
 DOES>
@@ -100,10 +110,10 @@ DOES>
 
 : STRUCT> DROP ;
 
-: [] SWAP <BUILDS DUP , * 1 + ALLOT  DOES> DUP @ ROT * + 2 +  ; ( SMUDGE )
+: [] SWAP <BUILDS DUP , * 1 + ALLOT  DOES> DUP @ ROT * + 2 +  ; 
 		
-( : $ <BUILDS 34 WORD HERE C@ 1 + ALLOT DOES> COUNT ; )
 
+( the actual structure definitions - this is our game object )
 
 1 CONSTANT ?SPRITE-ISALIVE
 
@@ -122,6 +132,8 @@ DOES>
 	C| OBJ-FLAGS
 STRUCT>
 
+( an object descriptor describing an object on a a level )
+
 0 CONSTANT E-PATROLTYPE
 1 CONSTANT E-KEYTYPE 
 
@@ -137,6 +149,8 @@ STRUCT>
 STRUCT>
 
 ." type extensions "  HERE LASTHERE @  - U. CR HERE LASTHERE ! 
+
+( various global variables )
 
 0 VARIABLE CURRENT-DESC
 
@@ -158,15 +172,21 @@ STRUCT>
 
 ( 1 512 [] TILES  )
 
-." tile array "  HERE LASTHERE @  - U. CR HERE LASTHERE ! 
+( ." tile array "  HERE LASTHERE @  - U. CR HERE LASTHERE ! )
+
+( an array of game objets )
 
 7 CONSTANT MAX-SPRITES
 OBJ-STRUCT MAX-SPRITES [] GAME-SPRITES
+
+( sentinel that holds the address of the last sprite )
 
 0 VARIABLE LAST-SPRITE
 MAX-SPRITES GAME-SPRITES LAST-SPRITE !
 
 ." sprite array "  HERE LASTHERE @  - U. CR HERE LASTHERE ! 
+
+( code to support run length decoding of background tile maps )
 
 0 VARIABLE DECODE-PTR 
 
@@ -186,7 +206,9 @@ MAX-SPRITES GAME-SPRITES LAST-SPRITE !
 																  LOOP  R> 1 + >R  
 							 ENDIF 
 			0 +LOOP ;
-			
+
+( words used to look-up from fields in the game data )
+
 : GET-NUM-LEVELS 		13 SPN ! TEST DROP DPTR @  C@ ;
 : GET-LEVEL  			2 * 1 + 13 SPN ! TEST DROP DPTR @  +  @ DPTR @  + ;
 : GET-NAME-FIELD  		DUP @ + 2 + ;
@@ -206,6 +228,8 @@ MAX-SPRITES GAME-SPRITES LAST-SPRITE !
 
 ." level decomp "  HERE LASTHERE @  - U. CR HERE LASTHERE ! 
 
+( code used at compile time to generate the quadratic jump curve )
+
 0 VARIABLE Y
 0 VARIABLE DY
 
@@ -215,8 +239,6 @@ MAX-SPRITES GAME-SPRITES LAST-SPRITE !
  PLOT-CURVE  
 
 ." jump curve "  HERE LASTHERE @  - U. CR HERE LASTHERE ! 
-
-( DRAW-CURVE 24 0 DO I JUMP-CURVE @ I . . CR LOOP ; )
 
 : PLAYER-SELECT-SPRITE >R  R OBJ-X @ 8MOD /2  
 						   R OBJ-SPN @ JUMP @ 0= IF 
@@ -237,9 +259,9 @@ MAX-SPRITES GAME-SPRITES LAST-SPRITE !
  : CP-TL2 ( GET-TILE-ADDR ) *24 Y @ + DECODE-PTR ! ( GET-CELL-ADDR ) CP-TL ;
 
 
-( SET-TILE assumes that hgt and len are 1 )
-
 : SET-TILE  SROW !  SCOL !  254 SP2 ! 252 SP1 ! GWATTM GWBLM  ;
+
+( draw the player ) 
 
 : PLAYER-DRAW
 >R 
@@ -259,26 +281,34 @@ R> DROP ;
 	
 ." player draw "  HERE LASTHERE @  - U. CR HERE LASTHERE ! 
 	
+( handle player input - the player can be in one of three states: )
+( walking, jumping or falling ) 
+	
+	
+( trigger a jump )
+
 : PLAYER-DO-JUMP
 >R	
-	E-JUMPING JUMP ! 
-	JUMP-INDEX 0!
-	R OBJ-Y @ START-JUMP !
+	E-JUMPING JUMP ! 				( set the jump state )
+	JUMP-INDEX 0!					( reset the index into the jump curve )
+	R OBJ-Y @ START-JUMP !			( set the start y coord for the jump )
 	
-	6 2 KB IF 
-		176 R OBJ-SPN !
+	6 2 KB IF 						( use the currently held key to decide which way we are jumping )
+		176 R OBJ-SPN !				( and set the sprite id appropriately )
 		-2 R OBJ-DX !  
 	ELSE 
 	6 1 KB IF
 		 144 R OBJ-SPN !
 		2 R OBJ-DX ! 
-	ELSE
-		R OBJ-SPN @ 16 OR  R OBJ-SPN !
+	ELSE							
+		R OBJ-SPN @ 16 OR  R OBJ-SPN !	( if no key is being pressed, get the sprite id from the current sprite )	
 		R OBJ-DX 0!
 	ENDIF 
 	ENDIF 
 	
 R> DROP ;
+	
+( normal walking )
 	
 : PLAYER-DO-WALK
 	>R
@@ -298,11 +328,17 @@ R> DROP ;
 
 ." player input "  HERE LASTHERE @  - U. CR HERE LASTHERE ! 
 
+( collision checks )
+
+( update the state of a collapsing tile )
+
 : INC-CELL 2DUP GET-CELL 1 + DUP 14 = IF 
 										DROP CLR-CELL 
 									  ELSE 
 										ROT ROT SET-CELL 
 									  ENDIF ;
+
+( try and collapse this tile )
 
 : TRY-CRUMBLE 
 	2DUP 
@@ -319,14 +355,19 @@ R> DROP ;
 	ENDIF 
 ;
 
+( flags that hold the tile underneath the fox ) 
+
 0 VARIABLE GROUND-FLAG 
 0 VARIABLE CEILING-FLAG 
 0 VARIABLE WALL-FLAG 
 
+( this OR-assigns the value to the variable i.e. like |= in C )
 	
 : OR! DUP @ ROT OR SWAP ! ;
 
  ( : DBG-DRAWCELL ROW ! COL ! 1 LEN ! 1 HGT ! INVV ; )
+
+( determine if the player is standing on solid ground by testing the three cells below the player )
 
 : PLAYER-CHECK-GROUND >R  R OBJ-Y @ 16  + /8  DUP DUP
 						  R OBJ-X @ 4   + /8  SWAP     GET-FLAG  GROUND-FLAG OR!
@@ -334,17 +375,23 @@ R> DROP ;
 						  R OBJ-X @ 20  + /8  SWAP     GET-FLAG  GROUND-FLAG OR!				 
 R> DROP ;
 						 
+( determine if the player is standing on a collapseable platform )
+						 
 : PLAYER-CRUMBLE-GROUND >R  R OBJ-Y @ 16 + /8  DUP DUP 
 						    R OBJ-X @ 4  + /8  SWAP  TRY-CRUMBLE
 						    R OBJ-X @ 12 + /8  SWAP  TRY-CRUMBLE 
 						    R OBJ-X @ 20 + /8  SWAP  TRY-CRUMBLE 
 R> DROP ; 	 
+
+( determine if the player is colliding with a solid ceiling )
 						 
 : PLAYER-CHECK-CEILING >R  R OBJ-Y @ 1 -  /8 DUP DUP  
 						   R OBJ-X @ 4 +  /8   SWAP    GET-FLAG  CEILING-FLAG OR!
 						   R OBJ-X @ 12 + /8   SWAP    GET-FLAG  CEILING-FLAG OR!
 					       R OBJ-X @ 20 + /8   SWAP    GET-FLAG  CEILING-FLAG OR! 
 R> DROP ;
+
+( determine if the player is colliding with a wall )
 
 : PLAYER-CHECK-WALL >R 
 						R OBJ-SPN @ 32 AND  IF 
@@ -359,61 +406,67 @@ R> DROP ;
 		
 ." player checks  "  HERE LASTHERE @  - U. CR HERE LASTHERE ! 		
 
+( checks to do while the player is in flight )
+
 : PLAYER-JUMPING-HITS 
 >R 
-	JUMP-INDEX @ 12 > IF
-		R PLAYER-CHECK-GROUND  
-		GROUND-FLAG @ 8 AND IF
-				1 DEAD !
+	JUMP-INDEX @ 12 > IF			( if we are descending .... )
+		R PLAYER-CHECK-GROUND  		( ... check the ground )
+		GROUND-FLAG @ 8 AND IF		( ... is deadly tile? ) 
+				1 DEAD !			( ... then dead )
 			ELSE
-			GROUND-FLAG @ IF 
-				R OBJ-SPN  @ 239 AND R OBJ-SPN !
+			GROUND-FLAG @ IF 						( if ground .. )
+				R OBJ-SPN  @ 239 AND R OBJ-SPN !	( ... sprite id and change state to walking )
 				E-WALKING JUMP !
 			ENDIF 
 			ENDIF 
-	ELSE
-		  R PLAYER-CHECK-CEILING 
-		 CEILING-FLAG @ 8 AND IF
-			1 DEAD !
+	ELSE							( if are ascending ... )
+		  R PLAYER-CHECK-CEILING 	( ... check the ceiling )
+		 CEILING-FLAG @ 8 AND IF	( ... is deadly tile> )
+			1 DEAD !				( ... then dead )
 		 ELSE 
-		 CEILING-FLAG @ 1 AND IF 
+		 CEILING-FLAG @ 1 AND IF 	( .. else solid, cancel horizontal velocity, and adjust jump )
 			 R OBJ-DX 0! 
 			 12 JUMP-INDEX @ - 11  + JUMP-INDEX ! 
 			 ENDIF
 		 ENDIF 
 	ENDIF 
 		
-	R PLAYER-CHECK-WALL  
+	R PLAYER-CHECK-WALL  			( if we have hit a solid wall ..)
 	WALL-FLAG @ 1 AND IF 
-		 R OBJ-OLDX @ R OBJ-X !
-	ELSE  WALL-FLAG @ 8 AND IF
-		1 DEAD !
+		 R OBJ-OLDX @ R OBJ-X !		( reset xposition )
+	ELSE  WALL-FLAG @ 8 AND IF		( else if deadly .... )
+		1 DEAD !					( ... then dead )
 		ENDIF
 	ENDIF
 R> DROP ;
 
+( checks to do when we are falling )
+
 : PLAYER-FALLING-HITS 
 >R
 	R PLAYER-CHECK-GROUND  
-	GROUND-FLAG @ IF
+	GROUND-FLAG @ IF						( if ground of any kind, set state to walking and sprite id to appropriate )
 		R OBJ-SPN @ 239 AND R OBJ-SPN !
 		E-WALKING JUMP !
 	ENDIF 
 R> DROP ;
 
+( checks to do when we are walking )
+
 : PLAYER-WALKING-HITS 
 >R
 	R PLAYER-CHECK-GROUND 
 
-	GROUND-FLAG @ 0=  IF
+	GROUND-FLAG @ 0=  IF					( if there's no ground .... )
 		R OBJ-SPN  @ 16 OR R OBJ-SPN !
-		E-FALLING JUMP !
-		ELSE GROUND-FLAG @ 8 AND IF
-		 1 DEAD ! 
-	ELSE GROUND-FLAG @ 4 AND IF 
-		-1 R OBJ-X +!
+		E-FALLING JUMP !					( ... we are falling )
+		ELSE GROUND-FLAG @ 8 AND IF			( if the ground is deadly ... )
+		 1 DEAD ! 							( ... we are dead )
+	ELSE GROUND-FLAG @ 4 AND IF 			( if we are on a conveyer ... )
+		-1 R OBJ-X +!						( ... adjust xpos )
 	ELSE    
-			GROUND-FLAG @ 3 AND IF
+			GROUND-FLAG @ 3 AND IF			( crumbling platform... )
 				NOOP
 			ELSE
 				GROUND-FLAG @ 16 AND IF
@@ -424,7 +477,7 @@ R> DROP ;
 	ENDIF 
 	ENDIF 
 		
-	R PLAYER-CHECK-WALL  
+	R PLAYER-CHECK-WALL  					( wall checks as above )
 	WALL-FLAG @ 1 AND IF 
 		R OBJ-OLDX @ R OBJ-X !
 	 ELSE  WALL-FLAG @ 8 AND IF
@@ -433,6 +486,8 @@ R> DROP ;
 	ENDIF	
 	
 R> DROP ;
+	
+( do the player background collision )
 	
 : PLAYER-HITS 
 	 GROUND-FLAG 0!
@@ -446,6 +501,8 @@ R> DROP ;
 		
 ." player hits  "  HERE LASTHERE @  - U. CR HERE LASTHERE ! 
 
+( move the player when they are jumping )
+
 : PLAYER-JUMPING
 >R
 	START-JUMP @ JUMP-INDEX @ JUMP-CURVE @ - R OBJ-Y !
@@ -457,8 +514,11 @@ R> DROP ;
 	ENDIF 
 R> DROP ;
 	
+( move the player when they are falling )
+	
 : PLAYER-FALLING  3 SWAP OBJ-Y +!  ;
 
+( tick the player )
 		  
 : PLAYER-TICK
 	>R
@@ -486,12 +546,16 @@ R> DROP ;
 
 ." player move "  HERE LASTHERE @  - U. CR HERE LASTHERE ! HERE FIRSTHERE @ - .  HERE U. 
 
+( update game objects )
+
 : TICK-SPRITE DUP  OBJ-TICK @ CFA EXECUTE ;
 
 : INIT-GAME-SPRITES  
 	MAX-SPRITES 0 DO 0 
 					I GAME-SPRITES OBJ-FLAGS ! 
 				LOOP  ;
+				
+( find a free slot for a new game object )
 				
 : FIND-FREE 
 	MAX-SPRITES 0 DO 
@@ -503,6 +567,8 @@ R> DROP ;
 													  ENDIF 
 	LOOP ; 
 
+( tick all the live game objects )
+
 : TICK-SPRITES  
 	0 GAME-SPRITES >R 
 	BEGIN 
@@ -512,6 +578,8 @@ R> DROP ;
 		R> OBJ-STRUCT + >R
 	R LAST-SPRITE @ = UNTIL 
 	R> DROP  ; 	
+
+( convert a tile id to a flag )
 
 : T2FLG
 	CASE 
@@ -526,22 +594,27 @@ R> DROP ;
 
 0 VARIABLE TILE-PTR
 
+( setup the background from the tilemap and the tile images )
+
 : SET-TILES 
-	6 SPN ! TEST DROP DPTR @ LEVEL @ + Y !
+	( SPN ! TEST DROP DPTR @ LEVEL @ + Y ! )
 	16 0 DO  
-		0 I  GET-CELL-ADDR TILE-PTR !
+		( I  GET-CELL-ADDR TILE-PTR ! )
 		32 0 DO  I J 
-			  GET-CELL DUP GET-TILE   ( TILE-PTR @ SWAP CP-TL2 )   I J SET-TILE  T2FLG  I J SET-FLAG 	
-			  1 TILE-PTR +!
+			  GET-CELL DUP GET-TILE  I J SET-TILE  T2FLG  I J SET-FLAG 	
+			  ( TILE-PTR +! )
 		LOOP 
-		 (  ATTON 254 SPN ! 0 COL ! 0 ROW ! PUTBLS   )
 	LOOP ; 
 
 ." sprite tick "  HERE LASTHERE @  - U. CR HERE LASTHERE ! HERE FIRSTHERE @ - . 
 	
+( draw an enemy sprite )
+	
 : ENEMY-DRAW   >R  R OBJ-Y @ /8  ROW ! R OBJ-X @ DUP /8  COL !  8MOD /2 R OBJ-SPN @ + SPN ! ATTOFF PUTBLS   R>   DROP ;
 
 ." sprite draw "  HERE LASTHERE @  - U. CR HERE LASTHERE ! HERE FIRSTHERE @ - . 
+		  
+( do a box collision check ) 
 		  
 : CHECK  >R
 			R OBJ-X @ R OBJ-CXMIN @ + PLAYER-HITX @ > IF 0 
@@ -558,6 +631,8 @@ R> DROP ;
 R> DROP ;
 	
 ." sprite check "  HERE LASTHERE @  - U. CR HERE LASTHERE ! HERE FIRSTHERE @ - . 
+
+( various tick functions )
 
 : NULL-TICK DROP ;
 	
@@ -589,6 +664,8 @@ R> DROP ;
 R> DROP ;
 
 ." door tick "  HERE LASTHERE @  - U. CR HERE LASTHERE ! HERE FIRSTHERE @ - . 
+	
+( various object constructors )
 	
 : MAKE-DOOR
 FIND-FREE >R
@@ -685,8 +762,6 @@ R> DROP ;
 	E-PATROLTYPE OF     MAKE-ENEMY ENDOF
 	ENDCASE
 ;
-
-
 	
 : MAKE-SPRITES LEVEL @ GET-LEVEL GET-NUMSPRITE-DESCS 0  DO 
 	I LEVEL @ GET-LEVEL GET-SPRITE-DESC MAKE-SPRITE 
@@ -699,18 +774,20 @@ R> DROP ;
 
 ( 0 VARIABLE FRAMES  )
 ( 0 VARIABLE LAST-FRAMES  )
-
 ( : COUNTER FRAMES 1 FRAMES +! ; )
-
 ( : SHOW-COUNTER FRAMES @ LAST-FRAMES @ - 17 0 AT . FRAMES @ LAST-FRAMES ! ; )
-
 ( : START-COUNTER  ' COUNTER INT-ON ; )
-
 ( : INNER-LOOP TICK-SPRITES   ; )
+
+( print the level name )
 
 : PRINT-NAME   LEVEL @ GET-LEVEL GET-NAME 17 0 AT TYPE  ;
 
+( print the scrolling crawl on the title screen )
+
 : PRINT-CRAWL 7 INK 17 0 AT LEVEL @ GET-LEVEL GET-NAME DROP + 32 TYPE ;
+
+( setup and main loop )
 
 : SHOW-LIVES   
 	19 ROW ! 129 SPN ! 
@@ -731,7 +808,8 @@ R> DROP ;
 	DRAW-BACKGROUND  
 	MAKE-SPRITES ;
 
-: NEW-LIFE ( 0 FRAMES ! ) 
+: NEW-LIFE 
+	( 0 FRAMES ! ) 
 	E-WALKING JUMP ! 
 	SETUP-LEVEL  
 	PRINT-NAME  
@@ -797,8 +875,6 @@ R> DROP ;
 
 ." main "  HERE LASTHERE @  - U. CR HERE LASTHERE ! 
 ."  "   LASTHERE @ FIRSTHERE @ - U.
-
-
 
 0 COL ! 0 ROW ! 
 

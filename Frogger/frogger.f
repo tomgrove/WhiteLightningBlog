@@ -14,11 +14,11 @@
 HEX
 
 : /2X  CREATE ;CODE E1 C, 					( push hl )
-					AF C,					( xor a )
-					CB C, 1C C, 			( rr h )
-					CB C, 1D C, 			( rr l )
-					E5 C,					( pop hl )
-					C3 C, 45 C, 61 C, 		( jp Next )
+					AF C,		        ( xor a )
+					CB C, 1C C, 		( rr h )
+					CB C, 1D C,             ( rr l )
+					E5 C,                   ( pop hl )
+					C3 C, 45 C, 61 C,       ( jp Next )
 			  SMUDGE
 			  
 /2X  /2 SMUDGE

@@ -1,0 +1,32 @@
+
+Z80 WHITE LIGHTNING   OASIS SOFTWARE 1984 
+
+
+ LASTHERE MSG # 4  FIRSTHERE MSG # 4  sprite creation 0 
+0 40604 custom assembly 356 
+356 40960 type extensions 568 
+924 41528 variables 217 
+1141 41745 sprite array 219 
+level decomp 657 
+2017 42621 jump curve 178 
+2195 42799 player draw 480 
+2675 43279 player input 256 
+2931 43535 player checks  621 
+3552 44156 player hits  588 4140 44744 
+player move 272 
+4412 45016 sprite tick 466 
+4878 sprite draw 69 
+4947 sprite check 128 
+5075 enemy tick 119 
+5194 door tick 36 
+5230 door make 210 
+5440 key tick 209 
+5649 common  73 
+5722 make key  209 
+5931 make player  74 
+6005 make enemy  139 
+6144 make sprites  105 
+6249 loop code  432 
+6681 main 414 
+ 7095 OK
+

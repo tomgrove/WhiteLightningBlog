@@ -1,8 +1,41 @@
 ( Fox game - an unfinished game that could make my fortune if I can send it back in time to 1984 )
-( and finish it )
+( ... finish it )
 
 ( some variables for tracking how much of the dictionary we have consumed )
 ( so we can tell how near we are from treading on the computation stack )
+
+( sprite numbers are explicit in the code rather than in symbolic constants )
+( constants are quite expensive in Forth, so horrible though it is, )
+( sprite numbers in tyhe code are all just given as literals )
+(                                                                 )
+(                                                                 )
+( 1-4           walking fox, 4 frame                              )
+( 5             jumping fox                                       )
+( 6             Tile sheet, rows are tiles, columns are screens   )
+(               Row 0     - empty                                 )
+(                   1     - solid blocks all movement             )
+(                   2     - semi-solid - can be walked on/through )
+(                   3     - conveyor belt                         )
+(                   4-5   - hazards                               )
+(                   6-13  - tiles in different states of collapse )
+(                   7-10  - baddy 1                               )
+(                   11    - key                                   )
+(                   12    - door                                  )
+(                   13    - level data                            )
+(                   14-17 - baddy2                                ) 
+(                                                                 )
+( The following are created externally:                           )
+(                                                                 )
+( 128-131       fox right facing, shifted                         )
+( 144-159       fox right facing, jumping                         )
+( 160-163       for left facing, shifted                          )
+( 176-191       fox left facing, jumping                          )
+(                                                                 )
+( 251           decompressed tile map                             )
+( 252           temp tile used as window into sheet               )
+( 253           composition buffer for fix sprite                 )
+( 254           background sprite built from tile map             )
+
 
 0 VARIABLE LASTHERE 
 0 VARIABLE FIRSTHERE 
@@ -10,7 +43,7 @@
 HERE DUP LASTHERE ! FIRSTHERE !
 
 	
-." sprite creation "  HERE LASTHERE @  - U. CR HERE LASTHERE ! 
+." sprite creation " HERE LASTHERE @  - U. CR HERE LASTHERE ! HERE FIRSTHERE @ - .  HERE U. 
 
 ( some assembly - mainly for multiplies and divides ) 
 
@@ -94,7 +127,7 @@ X0! 0!  SMUDGE
 
 DECIMAL 
 
-." custom assembly "  HERE LASTHERE @  - U. CR HERE LASTHERE ! 
+." custom assembly " HERE LASTHERE @  - U. CR HERE LASTHERE ! HERE FIRSTHERE @ - .  HERE U. 
 
 ( some forth words to define structures and arrays )
 
@@ -148,7 +181,7 @@ STRUCT>
 	C| DESC-TYPE
 STRUCT>
 
-." type extensions "  HERE LASTHERE @  - U. CR HERE LASTHERE ! 
+." type extensions "  HERE LASTHERE @  - U. CR HERE LASTHERE ! HERE FIRSTHERE @ - .  HERE U. 
 
 ( various global variables )
 
@@ -168,7 +201,7 @@ STRUCT>
 0 VARIABLE LIVES 
 0 VARIABLE TILEMAP-PTR
 
-." variables "  HERE LASTHERE @  - U. CR HERE LASTHERE ! 
+." variables "  HERE LASTHERE @  - U. CR HERE LASTHERE ! HERE FIRSTHERE @ - .  HERE U. 
 
 ( 1 512 [] TILES  )
 
@@ -190,22 +223,27 @@ MAX-SPRITES GAME-SPRITES LAST-SPRITE !
 
 0 VARIABLE DECODE-PTR 
 
+( we store 2-bytes per tile in our decoded buffer - the first byte is the tile id, the second is a flag  )
+( indicating the type of tile to speed up collisions                                                     )
+
 : DECODE-PTR, 
 	DECODE-PTR @ C!
 	2 DECODE-PTR +!
 ;
 
 ( usage -- src srclen dst )
+(                         )
+( a token beginning with the high-bit 128 set indicates the start of a run, otherwise it is a literal )
 
-: RL-DECODE 	DECODE-PTR ! OVER + 1 + SWAP ( 2DUP  U. U. )
+: RL-DECODE 	DECODE-PTR ! OVER + 1 + SWAP 
 				DO I  C@ 128  AND 0= IF 
-									I C@  DECODE-PTR, R> 1 + >R  
+									I C@  DECODE-PTR, R> 1 + >R  						
 							  ELSE 		
-									I C@  127 AND  R> 1 + >R  0 DO   
+									I C@  127 AND  R> 1 + >R  0 DO   					
 																	J C@ DECODE-PTR, 
 																  LOOP  R> 1 + >R  
 							 ENDIF 
-			0 +LOOP ;
+			0 +LOOP ;																	
 
 ( words used to look-up from fields in the game data )
 
@@ -217,7 +255,7 @@ MAX-SPRITES GAME-SPRITES LAST-SPRITE !
 : GET-NUMSPRITE-DESCS 	GET-KEYS-FIELD 1 + C@ ;
 : GET-SPRITE-DESC 		GET-KEYS-FIELD 2 + SWAP  8 * + ;
 
-: DECODE LEVEL @ GET-LEVEL DUP @ SWAP 2 + SWAP TILEMAP-PTR @  RL-DECODE ;
+: DECODE 251 SPN ! CLSM LEVEL @ GET-LEVEL DUP @ SWAP 2 + SWAP TILEMAP-PTR @  RL-DECODE ;
 
 : SET-TILEMAP-PTR 251 SPN ! TEST DROP DPTR @ TILEMAP-PTR ! ;
 : GET-CELL *64 SWAP *2 + TILEMAP-PTR @ + C@ ; 
@@ -226,7 +264,7 @@ MAX-SPRITES GAME-SPRITES LAST-SPRITE !
 : SET-FLAG *64 SWAP *2 1 + + TILEMAP-PTR @ + C! ; 
 : CLR-CELL *64 SWAP *2 + TILEMAP-PTR @ + 0 SWAP ! ;
 
-." level decomp "  HERE LASTHERE @  - U. CR HERE LASTHERE ! 
+." level decomp "  HERE LASTHERE @  - U. CR HERE LASTHERE ! HERE FIRSTHERE @ - .  HERE U. 
 
 ( code used at compile time to generate the quadratic jump curve )
 
@@ -235,10 +273,12 @@ MAX-SPRITES GAME-SPRITES LAST-SPRITE !
 
 2 24 [] JUMP-CURVE SMUDGE
 
-: PLOT-CURVE 0 Y ! 3 16 * DY ! 12 0 DO  DY @ Y  +! Y @ 16 / DUP  I JUMP-CURVE ! 23 I - JUMP-CURVE !  ( I . ) ( I ) ( JUMP-CURVE @ .)  -4 ( CR ) DY +! LOOP ; 
+: PLOT-CURVE 0 Y ! 3 16 * DY ! 12 0 DO  DY @ Y  +! Y @ 16 / DUP  I JUMP-CURVE ! 23 I - JUMP-CURVE !  -4  DY +! LOOP ; 
  PLOT-CURVE  
 
-." jump curve "  HERE LASTHERE @  - U. CR HERE LASTHERE ! 
+." jump curve "  HERE LASTHERE @  - U. CR HERE LASTHERE ! HERE FIRSTHERE @ - .  HERE U. 
+
+( choose a frame for the player's fox sprite based on the players position and state )
 
 : PLAYER-SELECT-SPRITE >R  R OBJ-X @ 8MOD /2  
 						   R OBJ-SPN @ JUMP @ 0= IF 
@@ -247,16 +287,10 @@ MAX-SPRITES GAME-SPRITES LAST-SPRITE !
 														R OBJ-Y  @ 8MOD /2 *2 *2  + +  
 												    ENDIF 									  
  R> DROP ;
-	
-: GET-TILE  SROW ! LEVEL @ 3 MOD  SCOL ! 1 HGT ! 1 LEN ! 252 SP1 ! 6 SP2 ! PWATTM PWBLM ;
 
-: *24 *2 *2 *2 DUP *2 + ;
+( a tile from the tile sheet - 6- and copy it into the scratch tile )
 
- ( : GET-TILE-ADDR *24 Y @ + ; )
- : GET-CELL-ADDR *64 *2 *2  + 254 SPN ! TEST DROP DPTR @ + ; 
- 
- : CP-TL DUP 256 + SWAP DO DECODE-PTR @ C@ I C! 3 DECODE-PTR +! 32 +LOOP ;
- : CP-TL2 ( GET-TILE-ADDR ) *24 Y @ + DECODE-PTR ! ( GET-CELL-ADDR ) CP-TL ;
+: GET-TILE  SROW ! LEVEL @ 3 MOD  SCOL ! 252 SP1 ! 6 SP2 ! PWATTM PWBLM ;
 
 
 : SET-TILE  SROW !  SCOL !  254 SP2 ! 252 SP1 ! GWATTM GWBLM  ;
@@ -279,11 +313,10 @@ MAX-SPRITES GAME-SPRITES LAST-SPRITE !
 	253 SPN ! PUTBLS  
 R> DROP ;
 	
-." player draw "  HERE LASTHERE @  - U. CR HERE LASTHERE ! 
+." player draw "  HERE LASTHERE @  - U. CR HERE LASTHERE ! HERE FIRSTHERE @ - .  HERE U. 
 	
 ( handle player input - the player can be in one of three states: )
 ( walking, jumping or falling ) 
-	
 	
 ( trigger a jump )
 
@@ -326,7 +359,7 @@ R> DROP ;
 	R> DROP
 ;
 
-." player input "  HERE LASTHERE @  - U. CR HERE LASTHERE ! 
+." player input " HERE LASTHERE @  - U. CR HERE LASTHERE ! HERE FIRSTHERE @ - .  HERE U. 
 
 ( collision checks )
 
@@ -404,7 +437,7 @@ R> DROP ;
 					 R OBJ-Y @ 8 +  /8     GET-FLAG  WALL-FLAG OR!
  R> DROP ; 
 		
-." player checks  "  HERE LASTHERE @  - U. CR HERE LASTHERE ! 		
+." player checks  " HERE LASTHERE @  - U. CR HERE LASTHERE ! HERE FIRSTHERE @ - .  HERE U. 
 
 ( checks to do while the player is in flight )
 
@@ -499,7 +532,7 @@ R> DROP ;
 		E-FALLING OF PLAYER-FALLING-HITS ENDOF
 	ENDCASE ;
 		
-." player hits  "  HERE LASTHERE @  - U. CR HERE LASTHERE ! 
+." player hits  "  HERE LASTHERE @  - U.  HERE LASTHERE ! HERE FIRSTHERE @ - .  HERE U.  CR 
 
 ( move the player when they are jumping )
 
@@ -596,13 +629,19 @@ R> DROP ;
 
 ( setup the background from the tilemap and the tile images )
 
+: DRAW-BACKGROUND ATTON 254 SPN ! 0 COL ! 0 ROW ! PUTBLS ;
+
 : SET-TILES 
-	( SPN ! TEST DROP DPTR @ LEVEL @ + Y ! )
+	254 SPN ! CLSM 7 INK 0 PAPER 1 BRIGHT SETAM 
 	16 0 DO  
-		( I  GET-CELL-ADDR TILE-PTR ! )
 		32 0 DO  I J 
-			  GET-CELL DUP GET-TILE  I J SET-TILE  T2FLG  I J SET-FLAG 	
-			  ( TILE-PTR +! )
+			  GET-CELL DUP IF 
+					DUP GET-TILE  
+					I J SET-TILE  T2FLG  
+					I J SET-FLAG 
+				ELSE 
+					DROP 
+				ENDIF 	
 		LOOP 
 	LOOP ; 
 
@@ -770,7 +809,7 @@ R> DROP ;
 
 ." make sprites  "  HERE LASTHERE @  - U. CR HERE LASTHERE ! HERE FIRSTHERE @ - . 
 
-: DRAW-BACKGROUND ATTON 254 SPN ! 0 COL ! 0 ROW ! PUTBLS ;
+
 
 ( 0 VARIABLE FRAMES  )
 ( 0 VARIABLE LAST-FRAMES  )

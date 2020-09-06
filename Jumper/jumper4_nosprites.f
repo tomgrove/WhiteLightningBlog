@@ -209,7 +209,7 @@ STRUCT>
 
 ( an array of game objets )
 
-7 CONSTANT MAX-SPRITES
+8 CONSTANT MAX-SPRITES
 OBJ-STRUCT MAX-SPRITES [] GAME-SPRITES
 
 ( sentinel that holds the address of the last sprite )
@@ -915,7 +915,7 @@ R> DROP ;
 ." main "  HERE LASTHERE @  - U. CR HERE LASTHERE ! 
 ."  "   LASTHERE @ FIRSTHERE @ - U.
 
-0 COL ! 0 ROW ! 
+ZAP 
 
 
 
